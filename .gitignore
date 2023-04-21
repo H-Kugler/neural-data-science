@@ -77,6 +77,10 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Ignored files
+.DS_Store
+*.csv
+
 # IPython
 profile_default/
 ipython_config.py
@@ -127,3 +131,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.DS_Store

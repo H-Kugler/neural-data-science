@@ -80,9 +80,9 @@ target/
 # Ignored files
 .DS_Store
 *.csv
-
-# Ignore Data
 data/
+poisson-gfpa/
+
 
 # IPython
 profile_default/

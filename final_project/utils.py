@@ -6,28 +6,6 @@ from tqdm import tqdm
 from openTSNE import TSNE
 import umap
 
-
-
-def choose_n_clusters(
-    X: np.ndarray, mm_class, max_clusters: int = 10, min_n_clusters: int = 1
-):
-    """
-    Chooses the number of clusters using BIC.
-    returns: best_n_clusters and its corresponding predictions
-    """
-    min_bic = np.inf
-    for n_clusters in tqdm(range(min_n_clusters, max_clusters + 1)):
-        mm = mm_class(n_components=n_clusters)
-        mm.fit(X)
-        bic = mm.bic(X)
-        if bic < min_bic:
-            min_bic = bic
-            best_n_clusters = n_clusters
-            best_mm = mm
-    print(f"Best result: {best_n_clusters} clusters, BIC = {min_bic}")
-    return best_n_clusters, best_mm.predict(X)
-
-
 def plot_2d_vis(results, title, clusters=None, transpose=False):
     """
     creates a 2d visualization of the results
@@ -119,6 +97,45 @@ def tsne_gridsearch(
                 progress_bar.update(1)
     return best_result, max_score, best_perplexity, best_exaggeration
 
+def choose_n_clusters(
+    X: np.ndarray, mm_class, max_clusters: int = 10, min_n_clusters: int = 1
+):
+    """
+    Chooses the number of clusters using BIC (or the accuracy score in case bic does not exist).
+    returns: best_n_clusters and its corresponding predictions
+    """
+    min_bic = np.inf
+    for n_clusters in tqdm(range(min_n_clusters, max_clusters + 1)):
+        mm = mm_class(n_components=n_clusters)
+        mm.fit(X)
+        bic = mm.bic(X)
+        if bic < min_bic:
+            min_bic = bic
+            best_n_clusters = n_clusters
+            best_mm = mm
+    print(f"Best result: {best_n_clusters} clusters, BIC = {min_bic}")
+    return best_n_clusters, best_mm.predict(X)
+
+def kmeans_choose_n_clusters(
+    X: np.ndarray, max_clusters: int = 10, min_n_clusters: int = 1
+):
+    """
+    Chooses the number of clusters using BIC (or the accuracy score in case bic does not exist).
+    returns: best_n_clusters and its corresponding predictions
+    """
+    min_score = np.inf
+    for n_clusters in tqdm(range(min_n_clusters, max_clusters + 1)):
+        kmeans = KMeans(n_clusters, n_init=10)
+        kmeans.fit(X)
+        score = kmeans.score(X)
+        if score < min_score:
+            min_score = score
+            best_n_clusters = n_clusters
+            best_kmeans = kmeans
+    print(f"Best result: {best_n_clusters} clusters, Score = {min_score}")
+    return best_n_clusters, best_kmeans.predict(X)
+
+
 class NBMM:
     """
     Negative Binomial Mixture Model
@@ -208,7 +225,7 @@ class NBMM:
     Negative Binomial Mixture Model
     """
 
-    def __init__(self, r=2, n_components=2, max_iter=1000):
+    def __init__(self, n_components=2, r=2, max_iter=1000):
         self.n_components = n_components
         self.r = r  # paper said that this can be fixed to 2
         self.pi = np.ones(n_components) / n_components

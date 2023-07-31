@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.cluster import KMeans
 
 def plot_2d_vis(results, title, clusters=None, transpose=False):
     # plot t-SNE
@@ -33,3 +34,87 @@ def plot_2d_vis(results, title, clusters=None, transpose=False):
             axs[row, col].set_title(f"{norm_key} {trans_key}".title())
             axs[row, col].set_xticks([])
             axs[row, col].set_yticks([])
+
+
+class NBMM:
+    """
+    Negative Binomial Mixture Model
+    """
+
+    def __init__(self, r=2, n_components=2, max_iter=1000):
+        self.n_components = n_components
+        self.r = r  # paper said that this can be fixed to 2
+        self.pi = np.ones(n_components) / n_components
+        self.max_iter = max_iter
+
+        self.eps = 1e-4
+
+    def fit(self, X: np.ndarray):
+        N, G = X.shape
+        # init with kmeans
+        kmeans = KMeans(n_clusters=self.n_components, n_init=10).fit(X)
+        mu = kmeans.cluster_centers_.T
+        self.p = mu / (self.r + mu)
+        # self.p = self.r / (self.r + np.random.rand(G, self.n_components))
+        self.pi = np.bincount(kmeans.labels_) / N
+
+        # EM-algorithm
+        z = np.zeros((N, self.n_components))
+        for _ in range(self.max_iter):
+            old_z = z
+            z = self._e_step(X)
+            self._m_step(X, z)
+            if (old_z == z).all():
+                break
+
+        return self.p
+
+    def predict(self, X: np.ndarray):
+        return self._e_step(X).argmax(axis=1)
+
+    def fit_predict(self, X: np.ndarray):
+        self.fit(X)
+        return self.predict(X)
+
+    def _e_step(self, X: np.ndarray):
+        """
+        Expectation step of the EM algorithm
+        """
+        ll = self._log_likelihood(X)
+        maxima = np.argmax(ll, axis=1)
+        z = np.eye(self.n_components)[maxima]
+        return z
+
+    def _m_step(self, X: np.ndarray, z: np.ndarray):
+        """
+        Maximization step of the EM algorithm
+        """
+        N_k = z.sum(axis=0)
+        self.pi = (N_k + self.eps) / N_k.sum()
+        mu = (X.T @ z + 1e-4) / (N_k + 1)
+        self.p = mu / (self.r + mu)
+
+    def _log_likelihood(self, X: np.ndarray):
+        """
+        Compute the log likelihood of the data given the model current parameters
+        """
+        log_likelihood = 0
+        log_likelihood = (
+            np.log(self.pi + self.eps)
+            + X @ np.log(self.p + self.eps)
+            + np.sum(self.r * np.log(1 - self.p), axis=0)
+        )
+        return log_likelihood
+
+    def bic(self, X: np.ndarray = None):
+        """
+        Compute the BIC of the data given the model current parameters
+        """
+        N, G = X.shape
+        z = self._e_step(X)
+        N_k = z.sum(axis=0)
+
+        return np.sum(
+            (G * np.log(N_k + self.eps)) / 2
+            + np.sum(-self._log_likelihood(X) * z, axis=0)
+        )

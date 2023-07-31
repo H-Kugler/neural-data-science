@@ -1,6 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.cluster import KMeans
+from tqdm import tqdm
+
+from openTSNE import TSNE
+import umap
+
 
 
 def choose_n_clusters(
@@ -11,7 +16,7 @@ def choose_n_clusters(
     returns: best_n_clusters and its corresponding predictions
     """
     min_bic = np.inf
-    for n_clusters in range(min_n_clusters, max_clusters + 1):
+    for n_clusters in tqdm(range(min_n_clusters, max_clusters + 1)):
         mm = mm_class(n_components=n_clusters)
         mm.fit(X)
         bic = mm.bic(X)
@@ -36,6 +41,8 @@ def plot_2d_vis(results, title, clusters=None, transpose=False):
         num_cols,
         figsize=(num_cols * 5, num_rows * 5),
     )
+    if not type(axs) is np.ndarray:
+        axs = np.array([axs])
     if axs.ndim == 1 and transpose:
         axs = axs.reshape(1, -1)
     elif axs.ndim == 1 and not transpose:
@@ -55,6 +62,62 @@ def plot_2d_vis(results, title, clusters=None, transpose=False):
             axs[row, col].set_title(f"{norm_key} {trans_key}".title())
             axs[row, col].set_xticks([])
             axs[row, col].set_yticks([])
+
+def plot_score_table(scores: list, title: str):
+    fig, axs = plt.subplots(figsize=(3, .9))
+    axs.table(
+        cellText=[
+            [f"{list(val.values())[0]:.4f}" for val in list(score.values())]
+            for score in scores
+        ],
+        colLabels=[norm for norm in list(scores[0].keys())],
+        rowLabels=["PCA 2D", "t-SNE", "UMAP"],
+        loc="upper center",
+    )
+    axs.set_xticks([])
+    axs.set_yticks([])
+    axs.get_xaxis().set_visible(False)
+    axs.get_yaxis().set_visible(False)
+    axs.set_title(title)
+
+    plt.show()
+
+def umap_gridsearch(pca_result, neighbor_space, metric, progress_bar=None):
+    max_score = 0
+    for neighbors in neighbor_space:
+        umap_func = umap.UMAP(
+            n_neighbors=neighbors,
+        )
+        umap_result = umap_func.fit_transform(pca_result)
+        score = metric(pca_result, umap_result)
+        if score > max_score:
+            max_score = score
+            best_neighbors = neighbors
+            best_result = umap_result
+        if progress_bar is not None:
+            progress_bar.update(1)
+    return best_result, max_score, best_neighbors
+
+def tsne_gridsearch(
+    pca_result, perplexity_space, exaggeration_space, metric, progress_bar=None
+):
+    max_score = 0
+    for perplexity in perplexity_space:
+        for exaggeration in exaggeration_space:
+            tsne = TSNE(
+                perplexity=perplexity,
+                exaggeration=None if exaggeration == 0 else exaggeration,
+            )
+            tsne_result = tsne.fit(pca_result)
+            score = metric(pca_result, tsne_result)
+            if score > max_score:
+                max_score = score
+                best_perplexity = perplexity
+                best_exaggeration = exaggeration
+                best_result = tsne_result
+            if progress_bar is not None:
+                progress_bar.update(1)
+    return best_result, max_score, best_perplexity, best_exaggeration
 
 class NBMM:
     """

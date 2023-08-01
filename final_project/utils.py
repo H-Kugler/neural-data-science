@@ -26,7 +26,7 @@ def plot_2d_vis(results, title, clusters=None, transpose=False):
     elif axs.ndim == 1 and not transpose:
         axs = axs.reshape(-1, 1)
 
-    fig.suptitle(title, fontsize=25)
+    fig.suptitle(title, fontsize=20)
     for i, (norm_key, sub_dict) in enumerate(results.items()):
         for j, (trans_key, result) in enumerate(sub_dict.items()):
             row, col = (i, j) if not transpose else (j, i)
@@ -35,7 +35,7 @@ def plot_2d_vis(results, title, clusters=None, transpose=False):
                 result[:, 1],
                 s=7,
                 c=clusters[norm_key][trans_key] if type(clusters) is dict else clusters,
-                cmap="tab20" if type(clusters) is dict else None,
+                cmap="tab20" if type(clusters) is dict and not type(clusters[norm_key][trans_key][0]) is str else None,
             )
             axs[row, col].set_title(f"{norm_key} {trans_key}".title())
             axs[row, col].set_xticks([])
@@ -115,26 +115,6 @@ def choose_n_clusters(
             best_mm = mm
     print(f"Best result: {best_n_clusters} clusters, BIC = {min_bic}")
     return best_n_clusters, best_mm.predict(X)
-
-def kmeans_choose_n_clusters(
-    X: np.ndarray, max_clusters: int = 10, min_n_clusters: int = 1
-):
-    """
-    Chooses the number of clusters using BIC (or the accuracy score in case bic does not exist).
-    returns: best_n_clusters and its corresponding predictions
-    """
-    min_score = np.inf
-    for n_clusters in tqdm(range(min_n_clusters, max_clusters + 1)):
-        kmeans = KMeans(n_clusters, n_init=10)
-        kmeans.fit(X)
-        score = kmeans.score(X)
-        if score < min_score:
-            min_score = score
-            best_n_clusters = n_clusters
-            best_kmeans = kmeans
-    print(f"Best result: {best_n_clusters} clusters, Score = {min_score}")
-    return best_n_clusters, best_kmeans.predict(X)
-
 
 class NBMM:
     """

@@ -2,6 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.cluster import KMeans
 from tqdm import tqdm
+import igraph as ig
+import leidenalg as la
+from sklearn.neighbors import kneighbors_graph
+from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
 
 from openTSNE import TSNE
 import umap
@@ -115,6 +119,46 @@ def choose_n_clusters(
             best_mm = mm
     print(f"Best result: {best_n_clusters} clusters, BIC = {min_bic}")
     return best_n_clusters, best_mm.predict(X)
+
+def score_clustering(true_labels, pred_labels):
+    """
+    Computes the accuracy score of a clustering.
+    """
+    return np.mean(
+        [
+            adjusted_rand_score(true_labels, pred_labels),
+            adjusted_mutual_info_score(true_labels, pred_labels),
+        ]
+    )
+
+
+def leiden_grid_search(gt_labels, input_data):
+    """
+    Perform a grid search over the resolution parameter for the Leiden algorithm.
+    """
+    resolutions = np.linspace(0.1, 4, 100)
+    best_partition = None
+    best_score = -np.inf
+    best_resolution = None
+    A = kneighbors_graph(input_data, 15)
+    sources, targets = A.nonzero()
+    g = ig.Graph(directed=False)
+    g.add_vertices(A.shape[0])
+    g.add_edges(list(zip(sources, targets)))
+    for resolution in tqdm(resolutions):
+        pred_labels = la.find_partition(
+            g,
+            la.RBConfigurationVertexPartition,
+            resolution_parameter=resolution,
+        ).membership
+        score = score_clustering(gt_labels, pred_labels)
+        if score > best_score:
+            best_partition = pred_labels
+            best_resolution = resolution
+            best_score = score
+    return best_partition, best_resolution
+
+
 
 class NBMM:
     """
